@@ -11,13 +11,16 @@ void
 exec_and_wait(char * const * cmd, long timeout)
 {
         pid_t cpid, w;
-        int status;
+        int status, done = 0;
         struct timespec tsstart, tscur;
-        int done = 0;
 
+        /* man time.h for clock explanation */
         clock_gettime(CLOCK_MONOTONIC, &tsstart);
+
+        /* man 2 fork */
         if((cpid = fork()) == 0) {
                 /* child proc */
+                /* man 3 exec */
                 if(execvp(cmd[0], cmd) == -1) {
                         printf("execvp error\n");
                 }
@@ -25,6 +28,7 @@ exec_and_wait(char * const * cmd, long timeout)
                 /* parent proc */
                 do {
                         clock_gettime(CLOCK_MONOTONIC, &tscur);
+                        /* man 2 wait */
                         w = waitpid(cpid, &status, WUNTRACED | WCONTINUED | WNOHANG);
 
                         if ((tscur.tv_sec - tsstart.tv_sec) >= timeout) {
@@ -32,7 +36,6 @@ exec_and_wait(char * const * cmd, long timeout)
                                 printf("%d\n", kill(cpid, SIGTERM));
                                 done = 1;
                         } else if (w == -1) {
-                                /* waitpid of -1 means error. but this could simply mean the child proc has already finished an exited */
                                 done = 1; 
                                 if(errno == ECHILD) { // Child has already exited.
 
@@ -54,6 +57,14 @@ exec_and_wait(char * const * cmd, long timeout)
 int
 main(int argc, char **argv)
 {
-        char * const cmd[] = { "sleep", "5", NULL };
-        exec_and_wait(cmd, 3);
+        char * const tests[3][3] = {
+                { "sleep", "5", NULL },
+                { "sleep", "2", NULL},
+                { "ls", "/tmp", NULL}
+        };
+        
+        for (int i = 0; i < 3; i++) {
+                printf("==== TEST %d ====\n", (i + 1));
+                exec_and_wait(tests[i], 3);
+        }
 }
